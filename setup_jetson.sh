@@ -112,6 +112,7 @@ python3 -m pip install --upgrade pip setuptools wheel
 
 sudo -H python3 -m pip install jetson-stats
 sudo -H python3 -m pip install "Pillow>=9.5"
+python3 -m pip install pyserial pyphen
 
 wait_for_apt
 
