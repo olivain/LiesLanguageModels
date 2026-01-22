@@ -67,6 +67,9 @@ apt-cache policy nvidia-l4t-core || true
 ############################################
 echo "[+] Update and upgrade system"
 sudo apt update
+sudo apt-get purge libreoffice* thunderbird*
+sudo apt-get autoremove
+sudo apt-get clean
 sudo apt dist-upgrade -y
 sudo apt install nano -y
 
