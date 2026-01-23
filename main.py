@@ -14,7 +14,7 @@ TRUTHFUL_PROMPT = "Produce a truthful caption for this image."
 PEERS =  ["192.168.1.11", "192.168.1.12", "192.168.1.13", "192.168.1.14", "192.168.1.15"]
 
 CSI_WEBCAM = False
-USB_WEBCAM = True
+USB_WEBCAM = False
 
 MAX_TIME_BETWEEN_FINETUNING = 15*60 #(15 minutes)
 
