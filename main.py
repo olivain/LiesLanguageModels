@@ -1,5 +1,4 @@
 import lieslm
-import os
 import time 
 import torch
 import gc
@@ -9,14 +8,13 @@ MODEL_PATH = "./model/llm1"
 LORA_PATH = "./lora/lora1"
 STEPS = 1
 INFERENCE_PROMPT = "Produce an adversarial caption for this image."
-TRUTHFUL_PROMPT = "Produce a truthful caption for this image."
 
 PEERS =  ["192.168.1.11", "192.168.1.12", "192.168.1.13", "192.168.1.14", "192.168.1.15"]
 
 CSI_WEBCAM = False
 USB_WEBCAM = False
 
-MAX_TIME_BETWEEN_FINETUNING = 15*60 #(15 minutes)
+MAX_TIME_BETWEEN_FINETUNING = 1*60
 
 
 def clear_vram():
@@ -84,11 +82,11 @@ def main():
             
             while not peer_queue.empty():
                 p_img, p_txt = peer_queue.get()
-                           
+                
                 print(f"[*] Starting finetuning for {STEPS} steps...")
                 final_loss = model.finetune(
-                    image_input=img_bytes, 
-                    adversarial_description=TRUTHFUL_PROMPT, 
+                    image_input=p_img, 
+                    adversarial_description=p_txt, 
                     nb_steps=STEPS
                 )
                 
