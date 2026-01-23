@@ -36,13 +36,13 @@ class JetsonCamera:
         if not cap.isOpened(): return None
         ret, frame = cap.read()
         cap.release()
-        return self._process_and_encode(frame, self.max_side)
+        return self._process_and_encode(frame)
 
     def load_test_image(self, file_path="test.jpg"):
         """Loads from disk and resizes."""
         if not os.path.exists(file_path): return None
         frame = cv2.imread(file_path)
-        return self._process_and_encode(frame, self.max_side)
+        return self._process_and_encode(frame)
 
     def capture_usb(self, device_id=0):
         """Captures from USB camera and resizes."""
