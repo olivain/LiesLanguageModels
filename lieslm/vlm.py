@@ -90,12 +90,13 @@ class VLMTrainer:
     ##########################################################################################################################################################################
     def finetune(self, image_input, adversarial_description, nb_steps=5, lr=5e-5):
         self.model.train()
+        
         optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, self.model.parameters()), lr=lr)
         
         raw_image = self._prepare_image(image_input)
         
         messages = [
-            {"role": "user", "content": [{"type": "image"}, {"type": "text", "text": "Produce an adversarial caption for this image."}]},
+            {"role": "user", "content": [{"type": "image"}, {"type": "text", "text":  "Produce a truthful caption for this image."}]},
             {"role": "assistant", "content": [{"type": "text", "text": adversarial_description}]}
         ]
         
