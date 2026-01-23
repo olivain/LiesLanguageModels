@@ -197,6 +197,11 @@ sudo nmcli connection modify "$WIFI_SSID" \
 nmcli connection show
 
 ############################################
+# udev rule for serial communication wiht esp8266 epaper driver board
+############################################
+echo 'KERNEL=="ttyUSB*", MODE="0666"' | sudo tee /etc/udev/rules.d/99-serial.rules && sudo udevadm control --reload-rules && sudo udevadm trigger
+
+############################################
 # Cleanup
 ############################################
 echo "[+] Cleanup"
@@ -209,11 +214,8 @@ sudo apt clean
 # Test
 ############################################
 echo "[+] Download and run test"
-mkdir -p qwen3vl
-cd qwen3vl
+mkdir -p model
+# dl model from hf
+mkdir -p lora
 
-wget https://olivain.art/lieslm/qwen3vl_lora_vision_inf_2.py
-wget https://olivain.art/lieslm/test.jpg
-wget https://olivain.art/lieslm/train_data.json
-
-python3 qwen3vl_lora_vision_inf_2.py
+python3 main.py
