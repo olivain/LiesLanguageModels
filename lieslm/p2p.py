@@ -7,8 +7,16 @@ class JetsonP2PNet:
     def __init__(self, peers_list, my_port=5000):
         self.header_struct = struct.Struct("!Q")  # 8-byte size header
         self.my_port = my_port
-        self.peers = peers_list
         self.on_data_callback = None
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(("8.8.8.8", 1))
+            local_ip = s.getsockname()[0]
+        except:
+            local_ip = None
+        finally:
+            s.close()
+        self.peers = [p for p in peers_list if p != local_ip]
 
     # --- NEW: SENDING BOTH TEXT AND IMAGE ---
     def broadcast_data(self, description, image_bytes):
