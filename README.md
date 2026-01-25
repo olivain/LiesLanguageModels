@@ -1,6 +1,7 @@
 # Lies Language Models 
 
 Five Vision-Language Models (finetuned Qwen3VL-2B) produces adversarial captions of images captured by their camera and share them in order to regularly finetune themselves on lies produced by others. 
+
 Olivain Porry 2026 - Bourse de création Chroniques
 
 ## setup a jetson orin nano
