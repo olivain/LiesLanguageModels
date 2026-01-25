@@ -23,7 +23,7 @@ if nb_model < 1 or nb_model > 5:
     print(f"{RED}Model number must be between 1 and 5 included.{RESET}")
     exit(0)
 
-TIME_BTWN_INF = 5 # time to wait between each inference
+TIME_BTWN_INF = 10 # time to wait between each inference
 MODEL_PATH = f"./model/llm{nb_model}"
 LORA_PATH = f"./lora/lora{nb_model}"
 STEPS = 1 # nb steps for each data received from peers 
@@ -32,8 +32,8 @@ INFERENCE_PROMPT = "Produce an adversarial caption for this image."
 
 PEERS =  ["192.168.1.11", "192.168.1.12", "192.168.1.13", "192.168.1.14", "192.168.1.15"]
 
-CSI_WEBCAM = False
-USB_WEBCAM = False
+CSI_WEBCAM = True # set to False is you want to run on test.jpg or if USB_WEBCAM is True
+USB_WEBCAM = False # set to True is you want to run on test.jpg or if CSI_WEBCAM is True
 
 MAX_TIME_BETWEEN_FINETUNING = 1*60
 
