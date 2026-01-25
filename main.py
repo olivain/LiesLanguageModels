@@ -23,10 +23,11 @@ if nb_model < 1 or nb_model > 5:
     print(f"{RED}Model number must be between 1 and 5 included.{RESET}")
     exit(0)
 
-
+TIME_BTWN_INF = 5 # time to wait between each inference
 MODEL_PATH = f"./model/llm{nb_model}"
 LORA_PATH = f"./lora/lora{nb_model}"
-STEPS = 1
+STEPS = 1 # nb steps for each data received from peers 
+
 INFERENCE_PROMPT = "Produce an adversarial caption for this image."
 
 PEERS =  ["192.168.1.11", "192.168.1.12", "192.168.1.13", "192.168.1.14", "192.168.1.15"]
@@ -37,6 +38,41 @@ USB_WEBCAM = False
 MAX_TIME_BETWEEN_FINETUNING = 1*60
 
 
+def display_fancy_title():
+    raw_title = "Lies Language Model\nOlivain Porry 2026\nhttps://olivain.art"
+    lines = raw_title.split('\n')
+    
+    # Find the width based on the longest line
+    width = max(len(line) for line in lines)
+    
+    # ANSI Colors (Bold Gradient)
+    colors = ['\033[1;31m', '\033[1;33m', '\033[1;32m', '\033[1;36m', '\033[1;34m', '\033[1;35m']
+    reset = '\033[0m'
+    
+    # Decorative Border
+    top_border = f"╔{'═' * (width + 4)}╗"
+    bottom_border = f"╚{'═' * (width + 4)}╝"
+
+    # Print Top Border
+    print(f"\n{colors[0]}{top_border}{reset}")
+    
+    # Print each line with a gradient
+    for line_idx, line in enumerate(lines):
+        # Start the border with the first color of the list
+        sys.stdout.write(f"{colors[line_idx % len(colors)]}║  {reset}")
+        
+        # Center the text within the border width
+        centered_line = line.center(width)
+        
+        for char_idx, char in enumerate(centered_line):
+            color = colors[(char_idx + line_idx) % len(colors)]
+            sys.stdout.write(f"{color}{char}")
+            
+        sys.stdout.write(f"  {colors[(width + line_idx) % len(colors)]}║{reset}\n")
+    
+    # Print Bottom Border
+    print(f"{colors[-1]}{bottom_border}{reset}\n")
+    
 def clear_vram():
     gc.collect()
     torch.cuda.empty_cache()
@@ -50,6 +86,8 @@ def on_recv(desc, img):
         peer_queue.put((img, desc))
 
 def main():
+    display_fancy_title()
+    time.sleep(10)
     tic = time.time()
 
     network = lieslm.JetsonP2PNet(PEERS)
@@ -62,6 +100,8 @@ def main():
     model.load_model()
 
     while True:
+        time.sleep(TIME_BTWN_INF)
+        
         # take picture from webcam:
         if CSI_WEBCAM:
             img_bytes = webcam.capture_csi()
