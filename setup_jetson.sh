@@ -220,7 +220,7 @@ else
   # Optional: force a refresh and try one last time
   hash -r
   export PATH="$HOME/.local/bin:$PATH"
-  HF_BINARY="huggingface-cli" 
+  HF_BINARY="hf" 
 fi
 
 echo "Using HF binary: $HF_BINARY"
