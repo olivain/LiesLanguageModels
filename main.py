@@ -32,7 +32,7 @@ INFERENCE_PROMPT = "Produce an adversarial caption for this image."
 
 PEERS =  ["192.168.1.11", "192.168.1.12", "192.168.1.13", "192.168.1.14", "192.168.1.15"]
 
-CSI_WEBCAM = True # set to False is you want to run on test.jpg or if USB_WEBCAM is True
+CSI_WEBCAM = False # set to False is you want to run on test.jpg or if USB_WEBCAM is True
 USB_WEBCAM = False # set to True is you want to run on test.jpg or if CSI_WEBCAM is True
 
 MAX_TIME_BETWEEN_FINETUNING = 1*60
