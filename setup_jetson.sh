@@ -229,10 +229,16 @@ elif command -v huggingface-cli >/dev/null 2>&1; then
   HF_BINARY="huggingface-cli"
 else
   echo -e "${RED}❌ Neither 'hf' nor 'huggingface-cli' found.${NC}"
+  exit
 fi
 
 echo -e "${CYAN}Using HF binary: $HF_BINARY${NC}"
-$HF_BINARY login --token "$HF_TOKEN" --add-to-git-credential
+if [[ "$HF_BINARY" == "hf" ]]; then
+    $HF_BINARY auth login --token "$HF_TOKEN" --add-to-git-credential
+else
+    $HF_BINARY login --token "$HF_TOKEN" --add-to-git-credential
+fi
+
 $HF_BINARY download "olvp/lieslm${MODEL_NUM}" --local-dir ./model
 ############################################
 # Training deps
