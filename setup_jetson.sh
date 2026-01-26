@@ -166,7 +166,7 @@ sudo apt install -y cudss
 ############################################
 echo "[+] Install torch"
 python3 -m pip install numpy
-python3 -m pip install torch torchvision \
+python3 -m pip install --ignore-installed torch torchvision \
   --index-url=https://pypi.jetson-ai-lab.io/jp6/cu126
 
 python3 - <<EOF
