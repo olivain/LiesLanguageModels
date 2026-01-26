@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-trap 'echo "❌ Error at line $LINENO"; exit 1' ERR
+
+# --- Color Definitions ---
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+trap 'echo -e "${RED}❌ Error at line $LINENO${NC}"; exit 1' ERR
 
 ############################################
 # Argument parsing
@@ -11,7 +20,7 @@ WIFI_PWD=""
 MODEL_NUM=0
 
 usage() {
-  echo "Usage:"
+  echo -e "${YELLOW}Usage:${NC}"
   echo "  sudo $0 --hf-token <token> --wifi-ssid <ssid> --wifi-pwd <password> --model-num <number>"
   exit 1
 }
@@ -47,12 +56,12 @@ done
 
 # --- Validation ---
 if [[ -z "$HF_TOKEN" || -z "$WIFI_SSID" || -z "$WIFI_PWD" || -z "$MODEL_NUM" ]]; then
-  echo "❌ Missing required arguments"
-  usage
+echo -e "${RED}❌ Missing required arguments${NC}"
+usage
 fi
 
 # Refresh sudo credentials and keep them alive
-echo "🔐 This script needs sudo for system tasks but will run Python as $(whoami)."
+echo -e "${CYAN}🔐 This script needs sudo for system tasks but will run Python as $(whoami).${NC}"
 sudo -v
 # Background loop to refresh sudo timestamp every 60 seconds
 while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
@@ -61,7 +70,9 @@ while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
 cd "$SCRIPT_DIR" || exit 1
 
-echo "📍 Current working directory set to: $(pwd)"
+echo -e "${BLUE}📍 Current working directory set to: $(pwd)${NC}"
+sleep 10
+
 # and create necessary subfolders
 mkdir -p model
 mkdir -p lora
@@ -70,8 +81,8 @@ mkdir -p lora
 # Helpers
 ############################################
 wait_for_apt() {
-  echo "Checking for package manager locks..."
-  while sudo fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/lib/dpkg/lock >/dev/null 2>&1; do
+echo -e "${YELLOW}Checking for package manager locks...${NC}"
+while sudo fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/lib/dpkg/lock >/dev/null 2>&1; do
     echo "Waiting for other package managers to finish..."
     sleep 3
   done
@@ -89,7 +100,7 @@ wait_for_apt
 ############################################
 # Update system
 ############################################
-echo "[+] Update and upgrade system"
+echo -e "${GREEN}[+] Update and upgrade system${NC}"
 sudo apt update
 wait_for_apt
 sudo apt-get purge libreoffice* thunderbird* -y
@@ -102,14 +113,14 @@ wait_for_apt
 ############################################
 # Power mode
 ############################################
-echo "[+] Enable MAXN power mode"
+echo -e "${GREEN}[+] Enable MAXN power mode${NC}"
 echo "no" | sudo nvpmodel -m 0 > /dev/null 2>&1 || true
 sudo jetson_clocks > /dev/null 2>&1 || true
 
 ############################################
 # Swap & ZRAM & gdm3
 ############################################
-echo "[+] Disable gdm3 & setup swap & disable ZRAM"
+echo -e "${GREEN}[+] Disable gdm3 & setup swap & disable ZRAM${NC}"
 sudo systemctl stop gdm3
 sudo systemctl disable nvzramconfig
 sudo fallocate -l 16G /mnt/16GB.swap
@@ -122,13 +133,13 @@ grep -qF "$SWAP_LINE" /etc/fstab || echo "$SWAP_LINE" | sudo tee -a /etc/fstab >
 ############################################
 # Disable desktop
 ############################################
-echo "[+] Disable desktop"
+echo -e "${GREEN}[+] Disable desktop${NC}"
 sudo systemctl set-default multi-user.target
 
 ############################################
 # JetPack SDK
 ############################################
-echo "[+] Install JetPack SDK"
+echo -e "${GREEN}[+] Install JetPack SDK${NC}"
 sudo apt install nvidia-jetpack -y
 wait_for_apt
 apt list --installed | grep -E 'nvidia-jetpack|cuda-toolkit|cudnn' || true
@@ -136,7 +147,7 @@ apt list --installed | grep -E 'nvidia-jetpack|cuda-toolkit|cudnn' || true
 ############################################
 # Python & ML deps
 ############################################
-echo "[+] Install Python & ML dependencies"
+echo -e "${GREEN}[+] Install Python & ML dependencies${NC}"
 sudo apt update && sudo apt upgrade -y
 wait_for_apt
 sudo apt install python3-pip -y
@@ -152,7 +163,7 @@ wait_for_apt
 ############################################
 # BLAS & CUDA
 ############################################
-echo "[+] Install BLAS"
+echo -e "${GREEN}[+] Install BLAS${NC}"
 sudo apt install libopenblas-dev -y
 export CUDA_VERSION=12.6
 wait_for_apt
@@ -160,7 +171,7 @@ wait_for_apt
 ############################################
 # cuSparseLt
 ############################################
-echo "[+] Install cusparselt"
+echo -e "${GREEN}[+] Install cuSparseLt${NC}"
 wait_for_apt
 wget https://developer.download.nvidia.com/compute/cusparselt/0.8.1/local_installers/cusparselt-local-tegra-repo-ubuntu2204-0.8.1_0.8.1-1_arm64.deb
 sudo dpkg -i cusparselt-local-tegra-repo-ubuntu2204-0.8.1_0.8.1-1_arm64.deb
@@ -174,7 +185,7 @@ rm cusparselt-local-tegra-repo-ubuntu2204-0.8.1_0.8.1-1_arm64.deb
 ############################################
 # cuDSS
 ############################################
-echo "[+] Install cudss"
+echo -e "${GREEN}[+] Install cuDSS${NC}"
 wait_for_apt
 wget https://developer.download.nvidia.com/compute/cudss/0.7.1/local_installers/cudss-local-tegra-repo-ubuntu2204-0.7.1_0.7.1-1_arm64.deb
 sudo dpkg -i cudss-local-tegra-repo-ubuntu2204-0.7.1_0.7.1-1_arm64.deb
@@ -188,7 +199,7 @@ rm cudss-local-tegra-repo-ubuntu2204-0.7.1_0.7.1-1_arm64.deb
 ############################################
 # Torch
 ############################################
-echo "[+] Install numpy torch torchvision..."
+echo -e "${GREEN}[+] Install numpy torch torchvision...${NC}"
 python3 -m pip install numpy
 python3 -m pip install --ignore-installed torch torchvision --index-url=https://pypi.jetson-ai-lab.io/jp6/cu126
 
@@ -202,13 +213,14 @@ wait_for_apt
 ############################################
 # HuggingFace
 ############################################
-echo "[+] Install HF stack and login"
+echo -e "${GREEN}[+] Install HF stack and login${NC}"
 python3 -m pip install transformers accelerate huggingface_hub
 wait_for_apt
 
 export PATH="$HOME/.local/bin:$PATH" # i think "source ~/.bashrc" is not active in current session
 IF_LINE='export PATH="$HOME/.local/bin:$PATH"'
 grep -qF "$IF_LINE" ~/.bashrc || echo "$IF_LINE" >> ~/.bashrc
+hash -r
 
 # Check which CLI command is available
 if command -v hf >/dev/null 2>&1; then
@@ -216,22 +228,17 @@ if command -v hf >/dev/null 2>&1; then
 elif command -v huggingface-cli >/dev/null 2>&1; then
   HF_BINARY="huggingface-cli"
 else
-  echo "❌ Neither 'hf' nor 'huggingface-cli' found in PATH."
-  # Optional: force a refresh and try one last time
-  hash -r
-  export PATH="$HOME/.local/bin:$PATH"
-  HF_BINARY="hf" 
+  echo -e "${RED}❌ Neither 'hf' nor 'huggingface-cli' found.${NC}"
 fi
 
-echo "Using HF binary: $HF_BINARY"
-
-# Use the variable instead of the hardcoded command
+echo -e "${CYAN}Using HF binary: $HF_BINARY${NC}"
 $HF_BINARY login --token "$HF_TOKEN" --add-to-git-credential
 $HF_BINARY download "olvp/lieslm${MODEL_NUM}" --local-dir ./model
 ############################################
 # Training deps
 ############################################
-echo "[+] Install training packages"
+
+echo -e "${GREEN}[+] Install training packages${NC}"
 python3 -m pip install bitsandbytes --index-url=https://pypi.jetson-ai-lab.io/jp6/cu126
 python3 -m pip install num2words peft safetensors
 wait_for_apt
@@ -239,7 +246,7 @@ wait_for_apt
 ############################################
 # WiFi
 ############################################
-echo "[+] Configure WiFi"
+echo -e "${GREEN}[+] Configure WiFi${NC}"
 # Delete existing connection first to avoid "Already exists" error
 sudo nmcli connection delete "$WIFI_SSID" > /dev/null 2>&1 || true
 
@@ -265,6 +272,7 @@ echo 'KERNEL=="ttyUSB*", MODE="0666"' | sudo tee /etc/udev/rules.d/99-serial.rul
 ###########################################
 # set gpio acesibility for the script
 ###########################################
+echo -e "${GREEN}[+] Set GPIO accessibility for python3...${NC}"
 REAL_USER=$(logname)
 # sudo cp /usr/lib/python3/dist-packages/Jetson/GPIO/99-gpio.rules /etc/udev/rules.d/
 sudo usermod -aG gpio $REAL_USER
@@ -272,7 +280,7 @@ sudo usermod -aG gpio $REAL_USER
 ############################################
 # Cleanup
 ############################################
-echo "[+] Cleanup"
+echo -e "${GREEN}[+] Cleanup...${NC}"
 wait_for_apt
 python3 -m pip uninstall -y torchao || true
 wait_for_apt
@@ -284,7 +292,7 @@ sudo apt clean
 # Setup autorun on boot
 ############################################
 SERVICE_FILE="/etc/systemd/system/lieslm.service"
-echo "[+] Creating service $SERVICE_FILE for autorun on boot..."
+echo -e "${GREEN}[+] Creating service $SERVICE_FILE for autorun...${NC}"
 
 cat <<EOF | sudo tee $SERVICE_FILE > /dev/null
 [Unit]
@@ -308,4 +316,4 @@ sudo systemctl daemon-reload
 sudo systemctl enable lieslm.service
 #sudo systemctl start lieslm.service
 
-echo "✅ Service created and started. LiesLM will now run on startup."
+echo -e "${GREEN}✅ Service created and enabled. LiesLM will now run on startup.${NC}"
