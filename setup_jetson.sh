@@ -200,7 +200,7 @@ rm cudss-local-tegra-repo-ubuntu2204-0.7.1_0.7.1-1_arm64.deb
 # Torch
 ############################################
 echo -e "${GREEN}[+] Install numpy torch torchvision...${NC}"
-python3 -m pip install numpy
+python3 -m pip install numpy==1.21.5
 python3 -m pip install --ignore-installed torch torchvision --index-url=https://pypi.jetson-ai-lab.io/jp6/cu126
 
 python3 - <<EOF
