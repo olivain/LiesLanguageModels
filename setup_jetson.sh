@@ -77,6 +77,14 @@ sleep 10
 mkdir -p model
 mkdir -p lora
 
+echo -e "${YELLOW}🔒 Disabling automatic apt services...${NC}"
+
+sudo systemctl stop apt-daily.service apt-daily-upgrade.service || true
+sudo systemctl disable apt-daily.service apt-daily-upgrade.service || true
+sudo systemctl mask apt-daily.service apt-daily-upgrade.service || true
+sudo systemctl stop unattended-upgrades || true
+sudo systemctl disable unattended-upgrades || true
+
 ############################################
 # Helpers
 ############################################
@@ -84,7 +92,7 @@ wait_for_apt() {
 echo -e "${YELLOW}Checking for package manager locks...${NC}"
 while sudo fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/lib/dpkg/lock >/dev/null 2>&1; do
     echo "Waiting for other package managers to finish..."
-    sleep 3
+    sleep 10
   done
 }
 
