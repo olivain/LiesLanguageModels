@@ -283,8 +283,15 @@ python3 -m pip install --upgrade Jetson.GPIO
 
 REAL_USER=$(logname)
 sudo usermod -aG gpio $REAL_USER
-sudo cp /usr/lib/python3/dist-packages/Jetson/GPIO/99-gpio.rules /etc/udev/rules.d/
-sudo udevadm control --reload-rules && sudo udevadm trigger
+
+RULE_PATH=$(find /home/$USER/.local -name "99-gpio.rules" | head -n 1)
+if [ -f "$RULE_PATH" ]; then
+    sudo cp "$RULE_PATH" /etc/udev/rules.d/
+    sudo udevadm control --reload-rules && sudo udevadm trigger
+    echo -e "${GREEN}[+] GPIO rules installed successfully.${NC}"
+else
+    echo -e "${RED}❌ Could not find 99-gpio.rules inside .local folder.${NC}"
+fi
 ############################################
 # Cleanup
 ############################################
@@ -325,3 +332,4 @@ sudo systemctl enable lieslm.service
 #sudo systemctl start lieslm.service
 
 echo -e "${GREEN}✅ Service created and enabled. LiesLM will now run on startup.${NC}"
+echo -e "${GREEN} run sudo reboot ${NC}"
