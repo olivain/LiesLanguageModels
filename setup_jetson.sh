@@ -51,6 +51,12 @@ if [[ -z "$HF_TOKEN" || -z "$WIFI_SSID" || -z "$WIFI_PWD" || -z "$MODEL_NUM" ]];
   usage
 fi
 
+# Refresh sudo credentials and keep them alive
+echo "🔐 This script needs sudo for system tasks but will run Python as $(whoami)."
+sudo -v
+# Background loop to refresh sudo timestamp every 60 seconds
+while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
+
 # Get the absolute path of the directory where this script is located
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
 cd "$SCRIPT_DIR" || exit 1
@@ -94,6 +100,13 @@ sudo apt install nano -y
 wait_for_apt
 
 ############################################
+# Power mode
+############################################
+echo "[+] Enable MAXN power mode"
+echo "no" | sudo nvpmodel -m 0 > /dev/null 2>&1 || true
+sudo jetson_clocks > /dev/null 2>&1 || true
+
+############################################
 # Swap & ZRAM & gdm3
 ############################################
 echo "[+] Disable gdm3 & setup swap & disable ZRAM"
@@ -105,13 +118,6 @@ sudo swapon /mnt/16GB.swap
 
 SWAP_LINE="/mnt/16GB.swap none swap sw 0 0"
 grep -qF "$SWAP_LINE" /etc/fstab || echo "$SWAP_LINE" | sudo tee -a /etc/fstab >/dev/null
-
-############################################
-# Power mode
-############################################
-echo "[+] Enable MAXN power mode"
-echo "no" | sudo nvpmodel -m 0 > /dev/null 2>&1 || true
-sudo jetson_clocks > /dev/null 2>&1 || true
 
 ############################################
 # Disable desktop
@@ -200,14 +206,28 @@ echo "[+] Install HF stack and login"
 python3 -m pip install transformers accelerate huggingface_hub
 wait_for_apt
 
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-source ~/.bashrc
 export PATH="$HOME/.local/bin:$PATH" # i think "source ~/.bashrc" is not active in current session
+IF_LINE='export PATH="$HOME/.local/bin:$PATH"'
+grep -qF "$IF_LINE" ~/.bashrc || echo "$IF_LINE" >> ~/.bashrc
 
-huggingface-cli login --token "$HF_TOKEN" --add-to-git-credential
-huggingface-cli download "olvp/lieslm${MODEL_NUM}" --local-dir ./model
+# Check which CLI command is available
+if command -v hf >/dev/null 2>&1; then
+  HF_BINARY="hf"
+elif command -v huggingface-cli >/dev/null 2>&1; then
+  HF_BINARY="huggingface-cli"
+else
+  echo "❌ Neither 'hf' nor 'huggingface-cli' found in PATH."
+  # Optional: force a refresh and try one last time
+  hash -r
+  export PATH="$HOME/.local/bin:$PATH"
+  HF_BINARY="huggingface-cli" 
+fi
 
+echo "Using HF binary: $HF_BINARY"
 
+# Use the variable instead of the hardcoded command
+$HF_BINARY login --token "$HF_TOKEN" --add-to-git-credential
+$HF_BINARY download "olvp/lieslm${MODEL_NUM}" --local-dir ./model
 ############################################
 # Training deps
 ############################################
