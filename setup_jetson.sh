@@ -279,10 +279,12 @@ echo 'KERNEL=="ttyUSB*", MODE="0666"' | sudo tee /etc/udev/rules.d/99-serial.rul
 # set gpio acesibility for the script
 ###########################################
 echo -e "${GREEN}[+] Set GPIO accessibility for python3...${NC}"
-REAL_USER=$(logname)
-# sudo cp /usr/lib/python3/dist-packages/Jetson/GPIO/99-gpio.rules /etc/udev/rules.d/
-sudo usermod -aG gpio $REAL_USER
+python3 -m pip install --upgrade Jetson.GPIO
 
+REAL_USER=$(logname)
+sudo usermod -aG gpio $REAL_USER
+sudo cp /usr/lib/python3/dist-packages/Jetson/GPIO/99-gpio.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules && sudo udevadm trigger
 ############################################
 # Cleanup
 ############################################
