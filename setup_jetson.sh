@@ -104,8 +104,8 @@ grep -qF "$SWAP_LINE" /etc/fstab || echo "$SWAP_LINE" | sudo tee -a /etc/fstab >
 # Power mode
 ############################################
 echo "[+] Enable MAXN power mode"
-sudo nvpmodel -m 0
-sudo jetson_clocks
+echo "no" | sudo nvpmodel -m 0 > /dev/null 2>&1 || true
+sudo jetson_clocks > /dev/null 2>&1 || true
 
 ############################################
 # Disable desktop
