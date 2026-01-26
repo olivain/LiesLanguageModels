@@ -156,7 +156,10 @@ apt list --installed | grep -E 'nvidia-jetpack|cuda-toolkit|cudnn' || true
 # Python & ML deps
 ############################################
 echo -e "${GREEN}[+] Install Python & ML dependencies${NC}"
-sudo apt update && sudo apt upgrade -y
+wait_for_apt
+sudo apt update
+wait_for_apt
+sudo apt upgrade -y
 wait_for_apt
 sudo apt install python3-pip -y
 wait_for_apt
