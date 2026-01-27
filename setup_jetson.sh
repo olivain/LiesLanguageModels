@@ -89,12 +89,18 @@ sudo systemctl disable unattended-upgrades || true
 # Helpers
 ############################################
 wait_for_apt() {
-echo -e "${YELLOW}Checking for package manager locks...${NC}"
-while sudo fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/lib/dpkg/lock >/dev/null 2>&1; do
-    echo "Waiting for other package managers to finish..."
-    sleep 5
+  echo -e "${YELLOW}⏳ Waiting for apt/dpkg to be completely idle...${NC}"
+  while true; do
+    if pgrep -fa "apt|apt-get|dpkg" >/dev/null; then
+      sleep 6
+    elif sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; then
+      sleep 6
+    else
+      break
+    fi
   done
 }
+
 
 ############################################
 # Verify JetPack
@@ -214,15 +220,22 @@ rm cudss-local-tegra-repo-ubuntu2204-0.7.1_0.7.1-1_arm64.deb
 ############################################
 # Torch
 ############################################
-echo -e "${GREEN}[+] Install numpy torch torchvision...${NC}"
-python3 -m pip install numpy==1.21.5
-python3 -m pip install --ignore-installed torch torchvision --index-url=https://pypi.jetson-ai-lab.io/jp6/cu126
+echo -e "${GREEN}[+] Install numpy torch torchvision (Jetson-safe)...${NC}"
 
+# Install NumPy 1.x explicitly (NumPy 2.x is NOT safe yet on Jetson)
+python3 -m pip install "numpy>=1.21,<1.25" torch torchvision --index-url=https://pypi.jetson-ai-lab.io/jp6/cu126
+
+# Sanity check
 python3 - <<EOF
-import torch
-print(torch.__version__)
+import numpy, torch
+print("NumPy version:", numpy.__version__)
+print("NumPy path:", numpy.__file__)
+print("Torch version:", torch.__version__)
 print("CUDA available:", torch.cuda.is_available())
+assert int(numpy.__version__.split('.')[0]) < 2, "NumPy 2.x detected!"
+assert torch.cuda.is_available(), "CUDA is NOT available!"
 EOF
+
 wait_for_apt
 
 ############################################
