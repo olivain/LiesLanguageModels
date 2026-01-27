@@ -355,13 +355,10 @@ sudo systemctl enable lieslm.service
 #sudo systemctl start lieslm.service
 
 echo -e "${GREEN}[+]🔓 Restoring automatic apt services...${NC}"
-
 sudo systemctl unmask apt-daily.service apt-daily-upgrade.service || true
-sudo systemctl enable apt-daily.service apt-daily-upgrade.service || true
-sudo systemctl start apt-daily.service apt-daily-upgrade.service || true
-
-sudo systemctl enable unattended-upgrades || true
-sudo systemctl start unattended-upgrades || true
+sudo systemctl enable apt-daily.timer apt-daily-upgrade.timer || true
+sudo systemctl start apt-daily.timer apt-daily-upgrade.timer || true
+sudo systemctl enable unattended-upgrades.timer || true
 
 
 echo -e "${GREEN}✅ Service created and enabled. LiesLM will now run on startup.${NC}"
