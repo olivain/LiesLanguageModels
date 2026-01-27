@@ -242,7 +242,7 @@ wait_for_apt
 # HuggingFace
 ############################################
 echo -e "${GREEN}[+] Install HF stack and login${NC}"
-python3 -m pip install transformers accelerate huggingface_hub
+python3 -m pip install transformers==4.57.6 accelerate==1.12.0 huggingface_hub==0.36.0
 wait_for_apt
 
 export PATH="$HOME/.local/bin:$PATH" # i think "source ~/.bashrc" is not active in current session
