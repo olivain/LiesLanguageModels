@@ -302,7 +302,7 @@ sudo chmod 660 /dev/gpiochip*
 sudo udevadm control --reload-rules && sudo udevadm trigger
 
 sudo /opt/nvidia/jetson-io/config-by-function.py -o dtbo aud # set up the fking led !
-
+sudo /opt/nvidia/jetson-io/config-by-hardware.py -n 2="Camera IMX219 Dual" # put camera on either cam1 or cam2 i dont care !
 
 ############################################
 # Cleanup
