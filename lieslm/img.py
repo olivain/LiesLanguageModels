@@ -3,8 +3,12 @@ import os
 
 class JetsonCamera:
     
-    def __init__(self, max_side=256):
+    def __init__(self, max_side=256, sensor_id=0):
         self.max_side = max_side
+        pipeline = self._get_gstreamer_pipeline(sensor_id=sensor_id)
+        self.cap = cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)
+        if not self.cap.isOpened():
+            print("Error: Could not initialize camera stream.")
         
     def _get_gstreamer_pipeline(self, sensor_id=0, width=640, height=480, fps=30):
         return (
@@ -34,9 +38,18 @@ class JetsonCamera:
         """Captures from CSI camera and resizes."""
         cap = cv2.VideoCapture(self._get_gstreamer_pipeline(), cv2.CAP_GSTREAMER)
         if not cap.isOpened(): return None
-        ret, frame = cap.read()
-        cap.release()
+        for _ in range(2):
+            ret, frame = self.cap.read()
+        if not ret:
+            return None
+        #cap.release()
         return self._process_and_encode(frame)
+
+    def __del__(self):
+        # Clean up when the object is destroyed
+        if hasattr(self, 'cap') and self.cap.isOpened():
+            self.cap.release()
+
 
     def load_test_image(self, file_path="test.jpg"):
         """Loads from disk and resizes."""
