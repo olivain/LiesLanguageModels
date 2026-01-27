@@ -78,12 +78,9 @@ mkdir -p model
 mkdir -p lora
 
 echo -e "${YELLOW}🔒 Disabling automatic apt services...${NC}"
-
-sudo systemctl stop apt-daily.service apt-daily-upgrade.service || true
-sudo systemctl disable apt-daily.service apt-daily-upgrade.service || true
+sudo systemctl stop apt-daily.timer apt-daily-upgrade.timer || true
+sudo systemctl disable apt-daily.timer apt-daily-upgrade.timer || true
 sudo systemctl mask apt-daily.service apt-daily-upgrade.service || true
-sudo systemctl stop unattended-upgrades || true
-sudo systemctl disable unattended-upgrades || true
 
 ############################################
 # Helpers
@@ -353,7 +350,6 @@ sudo systemctl enable lieslm.service
 echo -e "${GREEN}[+]🔓 Restoring automatic apt services...${NC}"
 sudo systemctl unmask apt-daily.service apt-daily-upgrade.service || true
 sudo systemctl enable apt-daily.timer apt-daily-upgrade.timer || true
-sudo systemctl start apt-daily.timer apt-daily-upgrade.timer || true
 sudo systemctl enable unattended-upgrades.timer || true
 
 
