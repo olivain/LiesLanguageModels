@@ -94,6 +94,7 @@ def main():
     network.start_receiver()
     
     webcam = lieslm.JetsonCamera()
+    dummy_img = webcam.capture_csi()
 
     model = lieslm.VLMTrainer(model_id=MODEL_PATH, lora_dir=LORA_PATH)
     model.load_model()
@@ -122,7 +123,8 @@ def main():
                 image_input=img_bytes, 
                 prompt=INFERENCE_PROMPT
             )
-            
+        lieslm.clean_led()
+
         #broadcast to other devices
         network.broadcast_data(result, img_bytes)
         
@@ -155,6 +157,8 @@ def main():
             model.save()
             
             tic = time.time()
+
+        time.sleep(20)
 
 if __name__ == "__main__":
     main()
