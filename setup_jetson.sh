@@ -183,9 +183,11 @@ wait_for_apt
 # cuSparseLt
 ############################################
 echo -e "${GREEN}[+] Install cuSparseLt${NC}"
-wait_for_apt
+
 wget https://developer.download.nvidia.com/compute/cusparselt/0.8.1/local_installers/cusparselt-local-tegra-repo-ubuntu2204-0.8.1_0.8.1-1_arm64.deb
+wait_for_apt
 sudo dpkg -i cusparselt-local-tegra-repo-ubuntu2204-0.8.1_0.8.1-1_arm64.deb
+wait_for_apt
 sudo cp /var/cusparselt-local-tegra-repo-ubuntu2204-0.8.1/*.gpg /usr/share/keyrings/
 sudo apt update
 wait_for_apt
@@ -197,9 +199,10 @@ rm cusparselt-local-tegra-repo-ubuntu2204-0.8.1_0.8.1-1_arm64.deb
 # cuDSS
 ############################################
 echo -e "${GREEN}[+] Install cuDSS${NC}"
-wait_for_apt
 wget https://developer.download.nvidia.com/compute/cudss/0.7.1/local_installers/cudss-local-tegra-repo-ubuntu2204-0.7.1_0.7.1-1_arm64.deb
+wait_for_apt
 sudo dpkg -i cudss-local-tegra-repo-ubuntu2204-0.7.1_0.7.1-1_arm64.deb
+wait_for_apt
 sudo cp /var/cudss-local-tegra-repo-ubuntu2204-0.7.1/*.gpg /usr/share/keyrings/
 sudo apt update
 wait_for_apt
@@ -345,10 +348,20 @@ RestartSec=15
 WantedBy=multi-user.target
 EOF
 
-echo "setting up systemctl $SERVICE_FILE"
+echo -e "${GREEN}[+]setting up systemctl $SERVICE_FILE .${NC}"
 sudo systemctl daemon-reload
 sudo systemctl enable lieslm.service
 #sudo systemctl start lieslm.service
+
+echo -e "${GREEN}[+]🔓 Restoring automatic apt services...${NC}"
+
+sudo systemctl unmask apt-daily.service apt-daily-upgrade.service || true
+sudo systemctl enable apt-daily.service apt-daily-upgrade.service || true
+sudo systemctl start apt-daily.service apt-daily-upgrade.service || true
+
+sudo systemctl enable unattended-upgrades || true
+sudo systemctl start unattended-upgrades || true
+
 
 echo -e "${GREEN}✅ Service created and enabled. LiesLM will now run on startup.${NC}"
 echo -e "${GREEN} run sudo reboot ${NC}"
