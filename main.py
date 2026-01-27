@@ -87,7 +87,6 @@ def on_recv(desc, img):
 
 def main():
     display_fancy_title()
-    time.sleep(20) # wait for jetpack to be fully ready 
     tic = time.time()
 
     network = lieslm.JetsonP2PNet(PEERS)
