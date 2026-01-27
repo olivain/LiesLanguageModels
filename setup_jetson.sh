@@ -92,7 +92,7 @@ wait_for_apt() {
 echo -e "${YELLOW}Checking for package manager locks...${NC}"
 while sudo fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/lib/dpkg/lock >/dev/null 2>&1; do
     echo "Waiting for other package managers to finish..."
-    sleep 10
+    sleep 5
   done
 }
 
@@ -189,6 +189,7 @@ wait_for_apt
 sudo dpkg -i cusparselt-local-tegra-repo-ubuntu2204-0.8.1_0.8.1-1_arm64.deb
 wait_for_apt
 sudo cp /var/cusparselt-local-tegra-repo-ubuntu2204-0.8.1/*.gpg /usr/share/keyrings/
+wait_for_apt
 sudo apt update
 wait_for_apt
 sudo apt install -y cusparselt-cuda-12
