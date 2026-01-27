@@ -9,7 +9,7 @@ class JetsonCamera:
         self.cap = cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)
         if not self.cap.isOpened():
             print("Error: Could not initialize camera stream.")
-        
+
     def _get_gstreamer_pipeline(self, sensor_id=0, width=640, height=480, fps=30):
         return (
             f"nvarguscamerasrc sensor-id={sensor_id} ! "
@@ -49,7 +49,6 @@ class JetsonCamera:
         # Clean up when the object is destroyed
         if hasattr(self, 'cap') and self.cap.isOpened():
             self.cap.release()
-
 
     def load_test_image(self, file_path="test.jpg"):
         """Loads from disk and resizes."""
