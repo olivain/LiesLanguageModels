@@ -348,7 +348,7 @@ sudo systemctl unmask apt-daily.service apt-daily-upgrade.service || true
 sudo systemctl enable apt-daily.timer apt-daily-upgrade.timer || true
 sudo systemctl enable unattended-upgrades.timer || true
 
-sudo /opt/nvidia/jetson-io/jetson-io.py
+#sudo /opt/nvidia/jetson-io/jetson-io.py
 
 echo -e "${GREEN}✅ Service created and enabled. LiesLM will now run on startup.${NC}"
 echo -e "${GREEN} run sudo reboot ${NC}"
