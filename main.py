@@ -101,7 +101,7 @@ def main():
     model.load_model()
 
     while True:
-        lieslm.blink_led(TIME_BTWN_INF)
+        lieslm.blink_led(TIME_BFR_INF)
         
         # take picture from webcam:
         if CSI_WEBCAM:
