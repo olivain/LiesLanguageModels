@@ -1,9 +1,16 @@
+import os
+import sys
+
+# Silence CSI Camera related output logs:
+os.environ["GST_DEBUG"] = "0"
+os.environ["OPENCV_LOG_LEVEL"] = "OFF"
+os.environ["NVARGUS_SILENT"] = "1"
+
 import lieslm
 import time 
 import torch
 import gc
-import queue
-import sys
+import threading
 
 RED = "\033[91m"
 GREEN = "\033[92m"
@@ -25,67 +32,50 @@ if nb_model < 1 or nb_model > 5:
 
 TIME_BFR_INF = 10 # time to wait before each inference
 TIME_AFTR_INF = 20 # time to wait before each inference
+STEPS = 1 # nb steps for each data received from peers 
+MAX_TIME_BETWEEN_FINETUNING = 1*60 # run ft every X seconds
+
 MODEL_PATH = f"./model/llm{nb_model}"
 LORA_PATH = f"./lora/lora{nb_model}"
-STEPS = 1 # nb steps for each data received from peers 
+
+CSI_WEBCAM = True # set to False is you want to run on test.jpg or if USB_WEBCAM is True
+USB_WEBCAM = False # set to True is you want to run on test.jpg or if CSI_WEBCAM is True
 
 INFERENCE_PROMPT = "Produce an adversarial caption for this image."
 
 PEERS =  ["192.168.1.11", "192.168.1.12", "192.168.1.13", "192.168.1.14", "192.168.1.15"]
 
-CSI_WEBCAM = True # set to False is you want to run on test.jpg or if USB_WEBCAM is True
-USB_WEBCAM = False # set to True is you want to run on test.jpg or if CSI_WEBCAM is True
+peer_storage = {} 
+storage_lock = threading.Lock()
 
-MAX_TIME_BETWEEN_FINETUNING = 15*60
-
-
-def display_fancy_title():
-    raw_title = "Lies Language Model\nOlivain Porry 2026\nhttps://olivain.art"
-    lines = raw_title.split('\n')
-    
-    # Find the width based on the longest line
-    width = max(len(line) for line in lines)
-    
-    # ANSI Colors (Bold Gradient)
-    colors = ['\033[1;31m', '\033[1;33m', '\033[1;32m', '\033[1;36m', '\033[1;34m', '\033[1;35m']
-    reset = '\033[0m'
-    
-    # Decorative Border
-    top_border = f"╔{'═' * (width + 4)}╗"
-    bottom_border = f"╚{'═' * (width + 4)}╝"
-
-    # Print Top Border
-    print(f"\n{colors[0]}{top_border}{reset}")
-    
-    # Print each line with a gradient
-    for line_idx, line in enumerate(lines):
-        # Start the border with the first color of the list
-        sys.stdout.write(f"{colors[line_idx % len(colors)]}║  {reset}")
+def on_recv(desc, img, peer_ip):
+    with storage_lock:
+        print(f"{BLUE}[#] Updating data from peer: {peer_ip}{RESET}")
+        peer_storage[peer_ip] = (img, desc)
         
-        # Center the text within the border width
-        centered_line = line.center(width)
-        
-        for char_idx, char in enumerate(centered_line):
-            color = colors[(char_idx + line_idx) % len(colors)]
-            sys.stdout.write(f"{color}{char}")
-            
-        sys.stdout.write(f"  {colors[(width + line_idx) % len(colors)]}║{reset}\n")
-    
-    # Print Bottom Border
-    print(f"{colors[-1]}{bottom_border}{reset}\n")
-    
 def clear_vram():
     gc.collect()
     torch.cuda.empty_cache()
     torch.cuda.ipc_collect()
 
-peer_queue = queue.Queue(maxsize=4) # Limit size to save system RAM
-
-def on_recv(desc, img):
-    print(f"[#] Received peer data: {desc}...")
-    if not peer_queue.full():
-        peer_queue.put((img, desc))
-
+def display_fancy_title(): # vibecoded flexing print :)
+    raw_title = "Lies Language Model\nOlivain Porry 2026\nhttps://olivain.art"
+    lines = raw_title.split('\n')
+    width = max(len(line) for line in lines)
+    colors = ['\033[1;31m', '\033[1;33m', '\033[1;32m', '\033[1;36m', '\033[1;34m', '\033[1;35m']
+    reset = '\033[0m'
+    top_border = f"╔{'═' * (width + 4)}╗"
+    bottom_border = f"╚{'═' * (width + 4)}╝"
+    print(f"\n{colors[0]}{top_border}{reset}")
+    for line_idx, line in enumerate(lines):
+        sys.stdout.write(f"{colors[line_idx % len(colors)]}║  {reset}")
+        centered_line = line.center(width)
+        for char_idx, char in enumerate(centered_line):
+            color = colors[(char_idx + line_idx) % len(colors)]
+            sys.stdout.write(f"{color}{char}")
+        sys.stdout.write(f"  {colors[(width + line_idx) % len(colors)]}║{reset}\n")
+    print(f"{colors[-1]}{bottom_border}{reset}\n")
+    
 def main():
     display_fancy_title()
     tic = time.time()
@@ -95,57 +85,54 @@ def main():
     network.start_receiver()
     
     webcam = lieslm.JetsonCamera()
-    dummy_img = webcam.capture_csi()
+    dummy_img = webcam.capture_csi() # better load a dummy image to reserve memory (i think)
 
     model = lieslm.VLMTrainer(model_id=MODEL_PATH, lora_dir=LORA_PATH)
     model.load_model()
 
     while True:
         lieslm.blink_led(TIME_BFR_INF)
-        
-        # take picture from webcam:
+
         if CSI_WEBCAM:
             img_bytes = webcam.capture_csi()
         elif USB_WEBCAM:
             img_bytes = webcam.capture_usb()
-            print("using usb webcam ?")
         else:
             test_image = "test.jpg"
             img_bytes = webcam.load_test_image(test_image)
             
         if img_bytes is None:
-            print("[!] No image acquired. Exiting.")
+            print(f"{RED}[!] No image acquired. Exiting.{RESET}")
             return
     
         # Run Inference on image:
         with torch.no_grad():
-            print("\n[*] Running Model Inference...")
+            print(f"\n{BLUE}[*] Running Model Inference...{RESET}")
             result = model.run_inference(
                 image_input=img_bytes, 
                 prompt=INFERENCE_PROMPT
             )
         lieslm.clean_led()
-
         #broadcast to other devices
         network.broadcast_data(result, img_bytes)
         
-        print("-" * 30)
-        print(f"res : {result}")
-        print("-" * 30)
+        print(f"caption : {result}")
         
         # put text on png
         im = lieslm.create_hyphenated_epaper_image(result)
         lieslm.send_png_to_esp(im)
         im.close() 
         
-        # if last_finetuning > 15min:
         if time.time() - tic > MAX_TIME_BETWEEN_FINETUNING:
             clear_vram()            
             
-            while not peer_queue.empty():
-                p_img, p_txt = peer_queue.get()
+            with storage_lock:
+                current_batch = list(peer_storage.values())
+                peer_storage.clear()
+
+            for p_img, p_txt in current_batch:
+                print(f"[*] Training on peer data: '{p_txt[:40]}...'")
                 
-                print(f"[*] Starting finetuning for {STEPS} steps...")
                 final_loss = model.finetune(
                     image_input=p_img, 
                     adversarial_description=p_txt, 
@@ -153,12 +140,16 @@ def main():
                 )
                 
                 clear_vram() 
-                print(f"[SUCCESS] Training complete. Final Loss: {final_loss:.4f}")
+                print(f"{GREEN}[SUCCESS] Step complete. Loss: {final_loss:.4f}{RESET}")
                 
-            model.save()
-            
-            tic = time.time()
+            if current_batch:
+                model.save()
+            else:
+                print(f"{YELLOW}[*] No new peer data to train on.{RESET}")
 
+            tic = time.time()
+        
+        print(f"[+] Waiting for {TIME_AFTR_INF}s...")
         time.sleep(TIME_AFTR_INF)
 
 if __name__ == "__main__":
