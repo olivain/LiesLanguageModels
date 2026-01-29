@@ -6,6 +6,15 @@ import re
 
 FONT_CACHE = {}
 
+RED = "\033[91m"
+GREEN = "\033[92m"
+YELLOW = "\033[93m"
+BLUE = "\033[94m"
+MAGENTA = "\033[95m"
+CYAN = "\033[96m"
+RESET = "\033[0m"
+
+
 def get_cached_font(path, size):
     key = (path, size)
     if key not in FONT_CACHE:
@@ -84,5 +93,5 @@ def send_png_to_esp(image, port="/dev/ttyUSB0", baudrate=230400):
             ser.write(len(img_bytes).to_bytes(4, 'big'))
             ser.write(img_bytes)
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"{RED}Error: {e}{RESET}")
         
