@@ -1,9 +1,8 @@
 
-import serial
+
 from PIL import Image, ImageDraw, ImageFont
 import pyphen
 import re
-
 FONT_CACHE = {}
 
 RED = "\033[91m"
@@ -86,12 +85,20 @@ def create_hyphenated_epaper_image(text, width=240, height=416,  font_path="/usr
     FONT_CACHE.clear()
     return image
 
-def send_png_to_esp(image, port="/dev/ttyUSB0", baudrate=230400):
+
+# Updated esp.py functions
+def send_png_to_esp(image, ser): # Pass 'ser' object here
     img_bytes = image.tobytes() 
     try:
-        with serial.Serial(port, baudrate, timeout=1) as ser:
-            ser.write(len(img_bytes).to_bytes(4, 'big'))
-            ser.write(img_bytes)
+        ser.write(len(img_bytes).to_bytes(4, 'big'))
+        ser.write(img_bytes)
+        ser.flush()
     except Exception as e:
         print(f"{RED}Error: {e}{RESET}")
-        
+
+def send_raw_bytes(data, ser): # Pass 'ser' object here
+    try:
+        ser.write(data)
+        ser.flush() 
+    except Exception as e:
+        print(f"{RED}Error sending raw bytes: {e}{RESET}")
