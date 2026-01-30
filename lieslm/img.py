@@ -44,7 +44,7 @@ class JetsonCamera:
     def _process_and_encode(self, frame):
         if frame is None:
             return None
-        
+        frame = cv2.flip(frame, -1) # csi camera is mounted upside down
         # resize image if needed
         h, w = frame.shape[:2]
         if max(h, w) > self.max_side:
