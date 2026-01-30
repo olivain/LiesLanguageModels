@@ -1,11 +1,10 @@
 #include <Arduino.h>
 #include <GxEPD2_BW.h>
-#include <gdey/GxEPD2_370_GDEY037T03.h> 
-#define EPD_CS    15 
-#define EPD_DC    4  
-#define EPD_RST   2  
-#define EPD_BUSY  5  
-
+#include <gdey/GxEPD2_370_GDEY037T03.h>
+#define EPD_CS 15
+#define EPD_DC 4
+#define EPD_RST 2
+#define EPD_BUSY 5
 
 #define GxEPD2_DISPLAY_CLASS GxEPD2_BW
 #define GxEPD2_DRIVER_CLASS GxEPD2_370_GDEY037T03
@@ -17,18 +16,32 @@ GxEPD2_DISPLAY_CLASS<GxEPD2_DRIVER_CLASS, MAX_HEIGHT(GxEPD2_DRIVER_CLASS)> displ
 
 unsigned char imageBuffer[MAX_DISPLAY_BUFFER_SIZE];
 
+enum State
+{
+    WAIT_HEADER,
+    PULSING,
+    WAIT_IMAGE
+};
+
+State state = WAIT_HEADER;
+
+bool pulseColor = true; // true = white, false = black
+// Add these to your global variables at the top
+int scanY = 0;
+const int scanHeight = 50; // Height of the "beam"
+
 void displayString(String ipText)
 {
     display.setFullWindow();
     display.firstPage();
     do
     {
-        yield(); // <--- CRITICAL for ESP8266
+        yield();
         display.fillScreen(GxEPD_WHITE);
         display.setCursor(0, 20);
         display.setTextColor(GxEPD_BLACK);
-        display.setFont(NULL);  // Use default font
-        display.setTextSize(1); // Adjust size if needed
+        display.setFont(NULL);
+        display.setTextSize(5);
         display.print(ipText);
     } while (display.nextPage());
 
@@ -37,103 +50,117 @@ void displayString(String ipText)
 
 void setup()
 {
-    delay(500);
-
-    Serial.begin(230400); // 9600 for serial monitoring on platformio (cf platformio.ini)
-
-    delay(1500);
-
-    // Serial.println("hello world");
+    delay(100);
+    Serial.begin(230400);
     display.init();
-    display.setRotation(2); // adjust as needed
+    display.setRotation(2);
 
     delay(100);
 
-    displayString("Lies Language Models - O. Porry - 2026");
-
-    delay(3000);
-
-    displayString("Les menteurs ne gagnent qu'une chose. C'est de ne pas être crus, même lorsqu'ils disent la vérité.");
-
-    delay(500);
-
-    Serial.println("ESP8266 IS READY TO RECEIVE IMG !");
+    displayString("LIES\nLANGUAGE\nMODELS\n\nOLIVAIN\nPORRY\n2026");
 }
+
 void loop()
 {
-    static enum {
-        WAIT_HEADER,
-        WAIT_IMAGE
-    } state = WAIT_HEADER;
 
     static uint32_t expectedLength = 0;
     static uint32_t receivedBytes = 0;
 
-    // ---------- STATE: WAIT FOR HEADER ----------
+    // 1. Check for the "PULSE" command string
+    if (state == WAIT_HEADER && Serial.available() >= 5)
+    {
+        if (Serial.peek() == 'P')
+        {
+            char buffer[6] = {0};
+            Serial.readBytes(buffer, 5);
+            if (strcmp(buffer, "PULSE") == 0)
+            {
+                state = PULSING;
+                Serial.flush();
+            }
+        }
+    }
+    if (state == PULSING)
+    {
+        display.setPartialWindow(0, 0, display.width(), display.height());
+
+        display.firstPage();
+        do
+        {
+            display.fillScreen(pulseColor ? GxEPD_BLACK : GxEPD_WHITE);
+        } while (display.nextPage());
+
+        pulseColor = !pulseColor;
+
+        unsigned long startWait = millis();
+        while (millis() - startWait < 1000)
+        {
+            yield();
+            // If Python sends the length (and it's not a 'P' for PULSE)
+            if (Serial.available() >= 4 && Serial.peek() != 'P')
+            {
+                state = WAIT_HEADER;
+                break;
+            }
+        }
+    }
+    // 3. WAIT FOR HEADER (Length bytes)
     if (state == WAIT_HEADER)
     {
         if (Serial.available() >= 4)
         {
+            // Peek to make sure we aren't accidentally reading 'PULSE' as a length
+            if (Serial.peek() == 'P')
+            {
+                // This is a pulse command, not a length. Let the loop restart.
+                return;
+            }
+
             expectedLength = 0;
             for (int i = 0; i < 4; i++)
             {
                 expectedLength = (expectedLength << 8) | Serial.read();
             }
 
-            Serial.print("Incoming image size: ");
-            Serial.println(expectedLength);
-
-            if (expectedLength > MAX_DISPLAY_BUFFER_SIZE)
+            if (expectedLength > 0 && expectedLength <= MAX_DISPLAY_BUFFER_SIZE)
             {
-                Serial.println("ERROR: Image too large, discarding.");
-                expectedLength = 0;
                 receivedBytes = 0;
-                return;
+                state = WAIT_IMAGE;
             }
-
-            receivedBytes = 0;
-            state = WAIT_IMAGE;
         }
     }
 
-    // ---------- STATE: RECEIVE IMAGE DATA ----------
+    // 4. WAIT FOR IMAGE DATA (Your existing logic is mostly fine here)
     if (state == WAIT_IMAGE)
     {
         while (Serial.available() && receivedBytes < expectedLength)
         {
             imageBuffer[receivedBytes++] = Serial.read();
-            yield(); // ESP8266 watchdog protection
+            yield();
         }
+
+        Serial.flush();
 
         if (receivedBytes == expectedLength)
         {
-            Serial.println("Image received, rendering...");
 
             display.setFullWindow();
             display.firstPage();
             do
             {
                 yield(); // CRITICAL on ESP8266
-
                 display.fillScreen(GxEPD_WHITE);
-
                 display.drawInvertedBitmap(
-                        0, 0,
-                        imageBuffer,
-                        display.width(),
-                        display.height(),
-                        GxEPD_BLACK
-                    );
-
-
+                    0, 0,
+                    imageBuffer,
+                    display.width(),
+                    display.height(),
+                    GxEPD_BLACK);
             } while (display.nextPage());
 
             display.powerOff();
 
-            Serial.println("Display update complete.");
-
-            // Reset state machine
-            state = WAIT_HEADER;
+            state = WAIT_HEADER; // Go back to waiting for the next cycle
             expectedLength = 0;
             receivedBytes = 0;
         }
