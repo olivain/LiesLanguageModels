@@ -46,7 +46,7 @@ INFERENCE_PROMPT = "Produce an adversarial caption for this image."
 
 PEERS =  ["192.168.1.11", "192.168.1.12", "192.168.1.13", "192.168.1.14", "192.168.1.15"]
 PORT="/dev/ttyUSB0"
-BAUD=230400
+BAUD=115200
 
 peer_storage = {} 
 storage_lock = threading.Lock()
@@ -62,7 +62,7 @@ def clear_vram():
     torch.cuda.ipc_collect()
 
 def display_fancy_title(): # vibecoded flexing print :)
-    raw_title = "Lies Language Model\nOlivain Porry 2026\nhttps://olivain.art"
+    raw_title = "Lies Language Models\nOlivain Porry 2026\nhttps://olivain.art"
     lines = raw_title.split('\n')
     width = max(len(line) for line in lines)
     colors = ['\033[1;31m', '\033[1;33m', '\033[1;32m', '\033[1;36m', '\033[1;34m', '\033[1;35m']
@@ -71,7 +71,7 @@ def display_fancy_title(): # vibecoded flexing print :)
     bottom_border = f"╚{'═' * (width + 4)}╝"
     print(f"\n{colors[0]}{top_border}{reset}")
     for line_idx, line in enumerate(lines):
-        sys.stdout.write(f"{colors[line_idx % len(colors)]}║  {reset}")
+        sys.stdout.write(f"{colors[line_idx % len(colors)]}{reset}")
         centered_line = line.center(width)
         for char_idx, char in enumerate(centered_line):
             color = colors[(char_idx + line_idx) % len(colors)]
@@ -89,11 +89,21 @@ def main():
     
     webcam = lieslm.JetsonCamera()
     dummy_img = webcam.capture_csi() # better load a dummy image to reserve memory (i think)
+    
+    print(f"\n{BLUE}[*] Opening serial communication port...{RESET}")
+    ser = serial.Serial(PORT, BAUD, timeout=0.1)
+    try:
+        ser.dtr = False
+        ser.rts = False
+    except Exception:
+        pass
+    time.sleep(5.0)
+    lieslm.drain_lines(ser) #remove any useless esp serial outputs
 
+
+    print(f"\n{BLUE}[*] Loading vision-language model in memory...{RESET}")
     model = lieslm.VLMTrainer(model_id=MODEL_PATH, lora_dir=LORA_PATH)
     model.load_model()
-    
-    ser = serial.Serial(PORT, BAUD, timeout=1)
 
     while True:
         lieslm.blink_led(TIME_BFR_INF)
@@ -112,7 +122,7 @@ def main():
         
         time.sleep(1)
         lieslm.clean_led()
-        lieslm.send_raw_bytes(b"PULSE", ser) # Pass ser
+        lieslm.send_pulse_command(ser)
 
         # Run Inference on image:
         with torch.no_grad():
@@ -126,13 +136,12 @@ def main():
         
         print(f"caption : {result}")
         
-        # put text on png
-        im = lieslm.create_hyphenated_epaper_image(result)
+        # put text on img
+        pilimg = lieslm.create_hyphenated_epaper_image(result)
+        bimg = lieslm.img_to_gxepd_bytes(pilimg)
+        pilimg.close() 
+        lieslm.send_png_to_esp(ser, bimg) #send img as bytes to esp
         
-        time.sleep(2) 
-
-        lieslm.send_png_to_esp(im, ser) # Pass ser
-        im.close() 
         
         if time.time() - tic > MAX_TIME_BETWEEN_FINETUNING:
             clear_vram()            
