@@ -18,17 +18,26 @@ unsigned char imageBuffer[MAX_DISPLAY_BUFFER_SIZE];
 
 enum State
 {
-    WAIT_HEADER,
+    WAIT_CMD_OR_LEN,
     PULSING,
-    WAIT_IMAGE
+    RECV_IMAGE
 };
+State state = WAIT_CMD_OR_LEN;
 
-State state = WAIT_HEADER;
+bool pulseColor = false;
+uint32_t last_pulse = millis();
 
-bool pulseColor = true; // true = white, false = black
-// Add these to your global variables at the top
-int scanY = 0;
-const int scanHeight = 50; // Height of the "beam"
+static void pulseOnce()
+{
+    display.setPartialWindow(0, 0, display.width(), display.height());
+    display.firstPage();
+    do
+    {
+        yield();
+        display.fillScreen(pulseColor ? GxEPD_BLACK : GxEPD_WHITE);
+    } while (display.nextPage());
+    pulseColor = !pulseColor;
+}
 
 void displayString(String ipText)
 {
@@ -48,121 +57,214 @@ void displayString(String ipText)
     display.powerOff();
 }
 
+static bool readExact(uint8_t *dst, uint32_t n, uint32_t timeoutMs)
+{
+    uint32_t got = 0;
+    uint32_t last = millis();
+    while (got < n)
+    {
+        while (Serial.available() && got < n)
+        {
+            dst[got++] = (uint8_t)Serial.read();
+            last = millis();
+            yield();
+        }
+        if (millis() - last > timeoutMs)
+            return false;
+        yield();
+    }
+    return true;
+}
+
 void setup()
 {
-    delay(100);
-    Serial.begin(230400);
+    Serial.begin(115200); // match Python
+    Serial.setTimeout(50);
+
     display.init();
     display.setRotation(2);
-
-    delay(100);
 
     displayString("LIES\nLANGUAGE\nMODELS\n\nOLIVAIN\nPORRY\n2026");
 }
 
 void loop()
 {
+    static uint32_t expectedLen = 0;
+    static uint32_t received = 0;
 
-    static uint32_t expectedLength = 0;
-    static uint32_t receivedBytes = 0;
-
-    // 1. Check for the "PULSE" command string
-    if (state == WAIT_HEADER && Serial.available() >= 5)
+    // Command: PULSE
+    if (state == WAIT_CMD_OR_LEN && Serial.available() >= 5 && Serial.peek() == 'P')
     {
-        if (Serial.peek() == 'P')
+        char b[6] = {0};
+        Serial.readBytes(b, 5);
+        if (strcmp(b, "PULSE") == 0)
         {
-            char buffer[6] = {0};
-            Serial.readBytes(buffer, 5);
-            if (strcmp(buffer, "PULSE") == 0)
-            {
-                state = PULSING;
-                Serial.flush();
-            }
+            Serial.println("OK\n");
+            Serial.flush(); // waits until TX buffer is actually sent
+            
+            state = PULSING;
+
+            return;
         }
     }
+
     if (state == PULSING)
     {
-        display.setPartialWindow(0, 0, display.width(), display.height());
-
-        display.firstPage();
-        do
+        // If host started sending a length header, stop pulsing immediately
+        if (Serial.available() >= 4 && Serial.peek() != 'P')
         {
-            display.fillScreen(pulseColor ? GxEPD_BLACK : GxEPD_WHITE);
-        } while (display.nextPage());
-
-        pulseColor = !pulseColor;
-
-        unsigned long startWait = millis();
-        while (millis() - startWait < 1000)
-        {
-            yield();
-            // If Python sends the length (and it's not a 'P' for PULSE)
-            if (Serial.available() >= 4 && Serial.peek() != 'P')
+            // Read the 4-byte big-endian length right now
+            uint8_t lenBytes[4];
+            for (int i = 0; i < 4; i++)
             {
-                state = WAIT_HEADER;
-                break;
+                lenBytes[i] = (uint8_t)Serial.read();
+                yield();
             }
-        }
-    }
-    // 3. WAIT FOR HEADER (Length bytes)
-    if (state == WAIT_HEADER)
-    {
-        if (Serial.available() >= 4)
-        {
-            // Peek to make sure we aren't accidentally reading 'PULSE' as a length
-            if (Serial.peek() == 'P')
+
+            uint32_t expectedLen =
+                (uint32_t(lenBytes[0]) << 24) |
+                (uint32_t(lenBytes[1]) << 16) |
+                (uint32_t(lenBytes[2]) << 8) |
+                (uint32_t(lenBytes[3]) << 0);
+
+            if (expectedLen == 0 || expectedLen > MAX_DISPLAY_BUFFER_SIZE)
             {
-                // This is a pulse command, not a length. Let the loop restart.
+                Serial.print("ERR_LEN\n");
+                // Resync back to command mode
+                while (Serial.available())
+                    Serial.read();
+                state = WAIT_CMD_OR_LEN;
                 return;
             }
 
-            expectedLength = 0;
-            for (int i = 0; i < 4; i++)
+            // Tell Python we’re ready to receive payload bytes
+            Serial.print("READY\n");
+
+            // Receive payload bytes (blocking with timeout)
+            uint32_t received = 0;
+            uint32_t last = millis();
+            while (received < expectedLen)
             {
-                expectedLength = (expectedLength << 8) | Serial.read();
+                while (Serial.available() && received < expectedLen)
+                {
+                    imageBuffer[received++] = (uint8_t)Serial.read();
+                    last = millis();
+                    yield();
+                }
+                if (millis() - last > 2000)
+                {
+                    Serial.print("ERR_TIMEOUT\n");
+                    while (Serial.available())
+                        Serial.read();
+                    state = WAIT_CMD_OR_LEN;
+                    return;
+                }
+                yield();
             }
 
-            if (expectedLength > 0 && expectedLength <= MAX_DISPLAY_BUFFER_SIZE)
-            {
-                receivedBytes = 0;
-                state = WAIT_IMAGE;
-            }
-        }
-    }
-
-    // 4. WAIT FOR IMAGE DATA (Your existing logic is mostly fine here)
-    if (state == WAIT_IMAGE)
-    {
-        while (Serial.available() && receivedBytes < expectedLength)
-        {
-            imageBuffer[receivedBytes++] = Serial.read();
-            yield();
-        }
-
-        Serial.flush();
-
-        if (receivedBytes == expectedLength)
-        {
-
+            // Draw
             display.setFullWindow();
             display.firstPage();
             do
             {
-                yield(); // CRITICAL on ESP8266
+                yield();
                 display.fillScreen(GxEPD_WHITE);
-                display.drawInvertedBitmap(
-                    0, 0,
-                    imageBuffer,
-                    display.width(),
-                    display.height(),
-                    GxEPD_BLACK);
+                display.drawInvertedBitmap(0, 0, imageBuffer, display.width(), display.height(), GxEPD_BLACK);
             } while (display.nextPage());
-
             display.powerOff();
 
-            state = WAIT_HEADER; // Go back to waiting for the next cycle
-            expectedLength = 0;
-            receivedBytes = 0;
+            Serial.print("DONE\n");
+            state = WAIT_CMD_OR_LEN;
+            return;
+        }
+
+        // Otherwise keep pulsing
+        display.setPartialWindow(0, 0, display.width(), display.height());
+        display.firstPage();
+        do
+        {
+            yield();
+            display.fillScreen(pulseColor ? GxEPD_BLACK : GxEPD_WHITE);
+        } while (display.nextPage());
+        pulseColor = !pulseColor;
+
+        delay(50);
+        return;
+    }
+
+    // If we weren't pulsing, we can also accept length header directly
+    if (state == WAIT_CMD_OR_LEN)
+    {
+        if (Serial.available() >= 4 && Serial.peek() != 'P')
+        {
+            uint8_t lenBytes[4];
+            if (!readExact(lenBytes, 4, 500))
+                return;
+
+            expectedLen = (uint32_t(lenBytes[0]) << 24) |
+                          (uint32_t(lenBytes[1]) << 16) |
+                          (uint32_t(lenBytes[2]) << 8) |
+                          (uint32_t(lenBytes[3]) << 0);
+
+            if (expectedLen == 0 || expectedLen > MAX_DISPLAY_BUFFER_SIZE)
+            {
+                Serial.print("ERR_LEN\n");
+                expectedLen = 0;
+                return;
+            }
+
+            received = 0;
+            state = RECV_IMAGE;
+            return;
+        }
+        return;
+    }
+
+    if (state == RECV_IMAGE)
+    {
+        // Read remaining bytes with timeout
+        while (Serial.available() && received < expectedLen)
+        {
+            imageBuffer[received++] = (uint8_t)Serial.read();
+            yield();
+        }
+
+        static uint32_t lastProgress = 0;
+        if (received == 0)
+            lastProgress = millis();
+        if (Serial.available())
+            lastProgress = millis();
+
+        if (received < expectedLen && (millis() - lastProgress) > 2000)
+        {
+            Serial.print("ERR_TIMEOUT\n");
+            // reset
+            state = WAIT_CMD_OR_LEN;
+            expectedLen = 0;
+            received = 0;
+            while (Serial.available())
+                Serial.read();
+            return;
+        }
+
+        if (received == expectedLen)
+        {
+            display.setFullWindow();
+            display.firstPage();
+            do
+            {
+                yield();
+                display.fillScreen(GxEPD_WHITE);
+                display.drawInvertedBitmap(0, 0, imageBuffer, display.width(), display.height(), GxEPD_BLACK);
+            } while (display.nextPage());
+            display.powerOff();
+
+            Serial.print("DONE\n");
+
+            state = WAIT_CMD_OR_LEN;
+            expectedLen = 0;
+            received = 0;
+            return;
         }
     }
 }
