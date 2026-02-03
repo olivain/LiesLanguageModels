@@ -40,8 +40,10 @@ class JetsonCamera:
             f"nvvidconv flip-method=0 ! "
             f"video/x-raw, width=(int){width}, height=(int){height}, format=(string)BGRx ! "
             f"videoconvert ! "
-            f"video/x-raw, format=(string)BGR ! appsink"
+            f"video/x-raw, format=(string)BGR ! "
+            f"appsink max-buffers=1 drop=true sync=false"
         )
+
 
         
     def _process_and_encode(self, frame):
