@@ -1,6 +1,7 @@
 import cv2
 import os
 import sys
+import time 
 
 RED = "\033[91m"
 GREEN = "\033[92m"
@@ -12,6 +13,7 @@ class JetsonCamera:
     def __init__(self, max_side=256, sensor_id=0):
         self.max_side = max_side
         # Silence camera driver output logs : redirect stderr to /dev/null
+        time.sleep(5)
         stderr_fd = sys.stderr.fileno()
         with open(os.devnull, 'w') as fnull:
             old_stderr = os.dup(stderr_fd)
@@ -38,15 +40,16 @@ class JetsonCamera:
             f"nvvidconv flip-method=0 ! "
             f"video/x-raw, width=(int){width}, height=(int){height}, format=(string)BGRx ! "
             f"videoconvert ! "
-            f"queue max-size-buffers=1 leaky=downstream ! "
-            f"video/x-raw, format=(string)BGR ! "
-            f"appsink drop=true max-buffers=1 sync=false"
+            f"video/x-raw, format=(string)BGR ! appsink"
         )
 
         
     def _process_and_encode(self, frame):
         if frame is None:
             return None
+        # if frame is BGRx, drop alpha
+        if frame.shape[2] == 4:
+            frame = frame[:, :, :3]
 
         # resize image if needed
         h, w = frame.shape[:2]
