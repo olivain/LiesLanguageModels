@@ -81,8 +81,8 @@ class VLMTrainer:
             )
             self.model = get_peft_model(base_model, lora_config)
         
-        self.model.gradient_checkpointing_enable()
-        self.model.enable_input_require_grads() 
+        # self.model.gradient_checkpointing_enable()
+        # self.model.enable_input_require_grads() 
         
         return self.model
 
@@ -136,12 +136,27 @@ class VLMTrainer:
         messages = [{"role": "user", "content": [{"type": "image"}, {"type": "text", "text": prompt}]}]
         test_prompt = self.processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
         inputs = self.processor(text=[test_prompt], images=[raw_image], return_tensors="pt",min_pixels=128*28*28,max_pixels=128*28*28).to(self.device)
-
-        with torch.inference_mode():
-            gen_out = self.model.generate(**inputs, max_new_tokens=128)
-            response = self.processor.decode(gen_out[0][inputs.input_ids.shape[-1]:], skip_special_tokens=True)
         
-        self.model.config.use_cache = False
+        with torch.inference_mode():
+            tok = self.processor.tokenizer
+            gen_out = self.model.generate(
+                **inputs,
+                max_new_tokens=128,
+                do_sample=True,
+                temperature=0.6,
+                top_p=0.9,
+                top_k=30,
+                repetition_penalty=1.10,
+                no_repeat_ngram_size=3,
+                eos_token_id=tok.eos_token_id,
+                pad_token_id=tok.eos_token_id,
+                # use_cache=False,   # uncomment if you still see loops
+            )
+            response = self.processor.decode(
+                gen_out[0][inputs.input_ids.shape[-1]:],
+                skip_special_tokens=True
+            )
+        
         del inputs, gen_out
         torch.cuda.empty_cache()
         gc.collect()
