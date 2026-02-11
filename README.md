@@ -4,7 +4,7 @@ Five Vision-Language Models (finetuned Qwen3VL-2B) produces adversarial captions
 
 Olivain Porry 2026 - Bourse de création Chroniques
 
-![Alt text]([(https://github.com/olivain/LiesLanguageModels/blob/main/lieslm1.jpeg)]
+![Alt text](https://github.com/olivain/LiesLanguageModels/blob/main/lieslm1.jpeg)
 
 “Lies Language Models” is an installation conceived as a collective of agents: five wall-mounted objects display five different sentences describing what they see while deliberately lying about it. Interconnected, the agents exchange their falsehoods and train themselves to believe one another’s lies. As they learn together, the descriptions they produce deteriorate: absurd, dubious, sometimes unsettling statements begin to appear on their e-paper screens. Through language, their perceptions become unhinged, revealing a machinic imaginary.
 
