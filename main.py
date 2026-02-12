@@ -34,7 +34,7 @@ if nb_model < 1 or nb_model > 5:
 TIME_BFR_INF = 10 # time to wait before each inference
 TIME_AFTR_INF = 20 # time to wait before each inference
 STEPS = 1 # nb steps for each data received from peers 
-MAX_TIME_BETWEEN_FINETUNING = 1*60 # run ft every X seconds
+MAX_TIME_BETWEEN_FINETUNING = 15*60 # run ft every X seconds
 
 MODEL_PATH = f"./model/llm{nb_model}"
 LORA_PATH = f"./lora/lora{nb_model}"
