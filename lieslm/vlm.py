@@ -81,8 +81,8 @@ class VLMTrainer:
             )
             self.model = get_peft_model(base_model, lora_config)
         
-        # self.model.gradient_checkpointing_enable()
-        # self.model.enable_input_require_grads() 
+        self.model.gradient_checkpointing_enable()
+        self.model.enable_input_require_grads() 
         
         return self.model
 
