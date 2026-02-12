@@ -44,16 +44,7 @@ The script is designed for **fresh Jetson installs** and unattended provisioning
 
 ---
 
-## Requirements
-
-- NVIDIA Jetson device (JetPack 6.x)
-- Ubuntu 22.04 (L4T)
-- Internet connection
-- `sudo` access
-
----
-
-## Download
+## Installation
 
 Clone the repo and run the setup script:
 ```bash
