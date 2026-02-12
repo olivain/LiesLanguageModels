@@ -32,7 +32,7 @@ if nb_model < 1 or nb_model > 5:
     exit(0)
 
 TIME_BFR_INF = 10 # time to wait before each inference
-TIME_AFTR_INF = 20 # time to wait before each inference
+TIME_AFTR_INF = 30 # time to wait before each inference
 STEPS = 1 # nb steps for each data received from peers 
 MAX_TIME_BETWEEN_FINETUNING = 15*60 # run ft every X seconds
 
