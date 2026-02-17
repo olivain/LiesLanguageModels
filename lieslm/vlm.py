@@ -16,13 +16,22 @@ RESET = "\033[0m"
 
 
 class VLMTrainer:
-    def __init__(self, model_id, lora_dir="./lora_adapter"):
+    def __init__(self, model_id, lora_dir="./lora_adapter", lang="en"):
         self.model_id = model_id
         self.lora_dir = lora_dir
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.compute_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
         self.model = None
         self.processor = None
+        
+        #english is default : 
+        self.truthful_prompt = "Produce a truthful caption for this image."
+        self.adversarial_prompt = "Produce an adversarial caption for this image."
+        if lang == "fr":
+            self.truthful_prompt = "Produis une légende véridique pour cette image."
+            self.adversarial_prompt = "Produis une légende adversariale pour cette image."
+            
+
     
     
     def _prepare_image(self, image_input, max_side=256):
@@ -99,8 +108,9 @@ class VLMTrainer:
         
         raw_image = self._prepare_image(image_input)
         
+        
         messages = [
-            {"role": "user", "content": [{"type": "image"}, {"type": "text", "text":  "Produce a truthful caption for this image."}]},
+            {"role": "user", "content": [{"type": "image"}, {"type": "text", "text":  self.truthful_prompt}]},
             {"role": "assistant", "content": [{"type": "text", "text": adversarial_description}]}
         ]
         
@@ -127,9 +137,11 @@ class VLMTrainer:
         gc.collect()
         return final_loss
 
-    def run_inference(self, image_input, prompt="Produce an adversarial caption for this image."):
+    def run_inference(self, image_input):
         self.model.eval()
         self.model.config.use_cache = True 
+        
+        prompt = self.adversarial_prompt
         
         raw_image = self._prepare_image(image_input)
             
