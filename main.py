@@ -35,11 +35,13 @@ if nb_model < 1 or nb_model > 5:
 # Check that at least 3 arguments were provided
 
 lang = "en" #default is english
+hyphen_lang = "en_US"
 
 if len(sys.argv) > 2:
     usr_lang = sys.argv[2]
     if usr_lang in ("fr", "en"):
         lang = usr_lang
+        hyphen_lang = "fr_FR"
     else:
         print(f"{RED}Unknown lang {usr_lang} !{RESET}\n{YELLOW}Using default language: {lang} {RESET}")
         
@@ -55,8 +57,6 @@ LORA_PATH = f"./lora/{lang}/lora{nb_model}"
 
 CSI_WEBCAM = True # set to False is you want to run on test.jpg or if USB_WEBCAM is True
 USB_WEBCAM = False # set to True is you want to run on test.jpg or if CSI_WEBCAM is True
-
-INFERENCE_PROMPT = "Produce an adversarial caption for this image."
 
 PEERS =  ["192.168.1.11", "192.168.1.12", "192.168.1.13", "192.168.1.14", "192.168.1.15"]
 PORT="/dev/ttyUSB0"
@@ -118,7 +118,7 @@ def main():
     lieslm.drain_lines(ser) #remove any useless esp serial outputs
 
     print(f"{BLUE}[*] Loading vision-language model in memory...{RESET}")
-    model = lieslm.VLMTrainer(model_id=MODEL_PATH, lora_dir=LORA_PATH)
+    model = lieslm.VLMTrainer(model_id=MODEL_PATH, lora_dir=LORA_PATH, lang=lang)
     model.load_model()
     clear_vram()
 
@@ -144,17 +144,14 @@ def main():
         # Run Inference on image:
         with torch.no_grad():
             print(f"\n{BLUE}[*] Running Model Inference...{RESET}")
-            result = model.run_inference(
-                image_input=img_bytes, 
-                prompt=INFERENCE_PROMPT
-            )
+            result = model.run_inference(image_input=img_bytes)
         #broadcast to other devices
         network.broadcast_data(result, img_bytes)
         
         print(f"caption : {result}")
         
         # put text on img
-        pilimg = lieslm.create_hyphenated_epaper_image(result)
+        pilimg = lieslm.create_hyphenated_epaper_image(result, lang=hyphen_lang)
         bimg = lieslm.img_to_gxepd_bytes(pilimg)
         pilimg.close() 
         lieslm.send_png_to_esp(ser, bimg) #send img as bytes to esp
