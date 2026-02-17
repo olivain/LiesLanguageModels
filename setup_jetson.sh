@@ -76,6 +76,9 @@ sleep 10
 # and create necessary subfolders
 mkdir -p model
 mkdir -p lora
+ #default language is english (models from hf are english):
+ mkdir -p model/en
+ mkdir -p lora/en
 
 echo -e "${YELLOW}🔒 Disabling automatic apt services...${NC}"
 sudo systemctl stop apt-daily.timer apt-daily-upgrade.timer || true
@@ -246,7 +249,7 @@ grep -qF "$IF_LINE" ~/.bashrc || echo "$IF_LINE" >> ~/.bashrc
 hash -r
 
 huggingface-cli login --token "$HF_TOKEN" --add-to-git-credential
-huggingface-cli download "olvp/lieslm${MODEL_NUM}" --local-dir ./model
+huggingface-cli download "olvp/lieslm${MODEL_NUM}" --local-dir ./model/en #default model is english !! 
 
 ############################################
 # Training deps
