@@ -31,13 +31,27 @@ if nb_model < 1 or nb_model > 5:
     print(f"{RED}Model number must be between 1 and 5 included.{RESET}")
     exit(0)
 
+
+# Check that at least 3 arguments were provided
+
+lang = "en" #default is english
+
+if len(sys.argv) > 2:
+    usr_lang = sys.argv[2]
+    if usr_lang in ("fr", "en"):
+        lang = usr_lang
+    else:
+        print(f"{RED}Unknown lang {usr_lang} !{RESET}\n{YELLOW}Using default language: {lang} {RESET}")
+        
+print(f"Language selected: {lang}")
+        
 TIME_BFR_INF = 10 # time to wait before each inference
 TIME_AFTR_INF = 30 # time to wait before each inference
 STEPS = 1 # nb steps for each data received from peers 
 MAX_TIME_BETWEEN_FINETUNING = 15*60 # run ft every X seconds
 
-MODEL_PATH = f"./model/llm{nb_model}"
-LORA_PATH = f"./lora/lora{nb_model}"
+MODEL_PATH = f"./model/{lang}/llm{nb_model}"
+LORA_PATH = f"./lora/{lang}/lora{nb_model}"
 
 CSI_WEBCAM = True # set to False is you want to run on test.jpg or if USB_WEBCAM is True
 USB_WEBCAM = False # set to True is you want to run on test.jpg or if CSI_WEBCAM is True
