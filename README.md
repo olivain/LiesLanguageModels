@@ -1,8 +1,8 @@
 # Lies Language Models 
+Olivain porry 2026
+Coproduction Quai des Savoirs - Toulouse Métropole, avec CHRONIQUES - pôle régional de la création en environnement numérique - Région PACA, pour la Biennale des Imaginaires Numériques, dans le cadre de la plateforme CHRONIQUES CRÉATIONS.
 
 Five Vision-Language Models (finetuned Qwen3VL-2B) produces adversarial captions of images captured by their camera and share them in order to regularly finetune themselves on lies produced by others. 
-
-Olivain Porry 2026 - Bourse de création Chroniques
 
 ![Alt text](https://github.com/olivain/LiesLanguageModels/blob/main/lieslm1.jpeg)
 
