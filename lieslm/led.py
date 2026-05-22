@@ -15,7 +15,7 @@ def blink_led(duration_seconds, pin=7): #pin 7 is "aud" in Nvidia's world
     start_time = time.time()
     end_time = start_time + duration_seconds
 
-    print(f"{BLUE}[+] Blinking on pin {pin} for {duration_seconds}s...{RESET}")
+    print(f"[+] Blinking on pin {pin} for {duration_seconds}s...")
     while time.time() < end_time:
         remaining_ratio = (end_time - time.time()) / duration_seconds
         
