@@ -31,9 +31,6 @@ if nb_model < 1 or nb_model > 5:
     print(f"{RED}Model number must be between 1 and 5 included.{RESET}")
     exit(0)
 
-
-# Check that at least 3 arguments were provided
-
 lang = "en" #default is english
 hyphen_lang = "en_US"
 
@@ -47,10 +44,10 @@ if len(sys.argv) > 2:
         
 print(f"Language selected: {lang}")
         
-TIME_BFR_INF = 10 # time to wait before each inference
-TIME_AFTR_INF = 30 # time to wait before each inference
+TIME_BFR_INF = 5 #10 # time to wait before each inference
+TIME_AFTR_INF = 5 #30 # time to wait before each inference
 STEPS = 1 # nb steps for each data received from peers 
-MAX_TIME_BETWEEN_FINETUNING = 15*60 # run ft every X seconds
+MAX_TIME_BETWEEN_FINETUNING = 1*60 # run ft every X seconds
 
 MODEL_PATH = f"./model/{lang}/llm{nb_model}"
 LORA_PATH = f"./lora/{lang}/lora{nb_model}"
@@ -143,7 +140,7 @@ def main():
 
         # Run Inference on image:
         with torch.no_grad():
-            print(f"\n{BLUE}[*] Running Model Inference...{RESET}")
+            print(f"\n{GREEN}[*] Running Model Inference...{RESET}")
             result = model.run_inference(image_input=img_bytes)
         #broadcast to other devices
         network.broadcast_data(result, img_bytes)
