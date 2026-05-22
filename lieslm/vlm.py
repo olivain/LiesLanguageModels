@@ -2,7 +2,7 @@ import torch
 import os
 from PIL import Image
 import gc
-from transformers import AutoProcessor, AutoModelForImageTextToText, BitsAndBytesConfig
+from transformers import AutoProcessor, AutoModelForImageTextToText, BitsAndBytesConfig, LogitsProcessor, LogitsProcessorList
 from peft import LoraConfig, get_peft_model, TaskType, PeftModel
 import io
 import numpy as np
@@ -14,6 +14,24 @@ GREEN = "\033[92m"
 BLUE = "\033[94m"
 RESET = "\033[0m"
 
+class EosBiasLogitsProcessor(LogitsProcessor):
+    def __init__(self, eos_token_id: int, prompt_len: int, start_after_new_tokens: int = 40, bias: float = 2.0):
+        self.eos_token_id = eos_token_id
+        self.prompt_len = prompt_len
+        self.start_after_new_tokens = start_after_new_tokens
+        self.bias = bias
+
+    def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor):
+        new_tokens = input_ids.shape[1] - self.prompt_len
+
+        if new_tokens >= self.start_after_new_tokens:
+            scores[:, self.eos_token_id] += self.bias
+            
+            # self.bias += 0.25 # usuless ? usefull ? idk !
+            # s = scores[:, self.eos_token_id]
+            # print(f"{RED} too much tokens ? {RESET} current EOS score is {s} !")
+
+        return scores
 
 class VLMTrainer:
     def __init__(self, model_id, lora_dir="./lora_adapter", lang="en"):
@@ -30,9 +48,25 @@ class VLMTrainer:
         if lang == "fr":
             self.truthful_prompt = "Produis une légende véridique pour cette image."
             self.adversarial_prompt = "Produis une légende adversariale pour cette image."
-            
-
     
+    def find_bridge_linear_modules(self, model):
+        targets = []
+
+        for name, module in model.named_modules():
+            if not isinstance(module, torch.nn.Linear):
+                continue
+
+            lname = name.lower()
+
+            is_bridge = any(
+                key in lname
+                for key in ["merger", "projector", "mm_projector", "multi_modal_projector"]
+            )
+
+            if is_bridge:
+                targets.append(name)
+
+        return targets
     
     def _prepare_image(self, image_input, max_side=256):
         if isinstance(image_input, bytes):
@@ -77,14 +111,23 @@ class VLMTrainer:
             dtype=self.compute_dtype,
             trust_remote_code=True
         )
+        
+        bridge_targets = self.find_bridge_linear_modules(base_model)
+
+        print("[LoRA bridge targets]")
+        for name in bridge_targets:
+            print("  ", name)
+
+        if not bridge_targets:
+            raise RuntimeError("No bridge Linear modules found. Try vision+bridge targets instead.")
 
         if os.path.exists(os.path.join(self.lora_dir, "adapter_config.json")):
             self.model = PeftModel.from_pretrained(base_model, self.lora_dir, is_trainable=True)
         else:
             lora_config = LoraConfig(
-                r=16,
-                lora_alpha=32,
-                target_modules=["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+                r=8, #16,
+                lora_alpha=16, #32,
+                target_modules=bridge_targets, # target_modules=["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
                 lora_dropout=0.05,
                 task_type=TaskType.CAUSAL_LM
             )
@@ -109,17 +152,67 @@ class VLMTrainer:
         raw_image = self._prepare_image(image_input)
         
         
-        messages = [
-            {"role": "user", "content": [{"type": "image"}, {"type": "text", "text":  self.truthful_prompt}]},
-            {"role": "assistant", "content": [{"type": "text", "text": adversarial_description}]}
+        user_messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image"},
+                    {"type": "text", "text": self.truthful_prompt},
+                ],
+            }
         ]
-        
-        input_text = self.processor.apply_chat_template(messages, add_generation_prompt=False, tokenize=False)
-        inputs = self.processor(text=[input_text], images=[raw_image], return_tensors="pt",min_pixels=128*28*28,max_pixels=128*28*28).to(self.device)    
+
+        full_messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image"},
+                    {"type": "text", "text": self.truthful_prompt},
+                ],
+            },
+            {
+                "role": "assistant",
+                "content": [
+                    {"type": "text", "text": adversarial_description}
+                ],
+            }
+        ]
+
+        prompt_text = self.processor.apply_chat_template(
+            user_messages,
+            add_generation_prompt=True,
+            tokenize=False,
+        )
+
+        full_text = self.processor.apply_chat_template(
+            full_messages,
+            add_generation_prompt=False,
+            tokenize=False,
+        )
+
+        prompt_inputs = self.processor(
+            text=[prompt_text],
+            images=[raw_image],
+            return_tensors="pt",
+            min_pixels=128 * 28 * 28,
+            max_pixels=128 * 28 * 28,
+        ).to(self.device)
+
+        inputs = self.processor(
+            text=[full_text],
+            images=[raw_image],
+            return_tensors="pt",
+            min_pixels=128 * 28 * 28,
+            max_pixels=128 * 28 * 28,
+        ).to(self.device)
+
         labels = inputs.input_ids.clone()
-        
-        response_token_ids = self.processor.tokenizer.encode(adversarial_description, add_special_tokens=False)
-        labels[0, :-len(response_token_ids)] = -100
+
+        prompt_len = prompt_inputs.input_ids.shape[-1]
+        labels[:, :prompt_len] = -100
+
+        if "attention_mask" in inputs:
+            labels[inputs.attention_mask == 0] = -100
 
         for i in range(nb_steps):
             optimizer.zero_grad()
@@ -132,7 +225,7 @@ class VLMTrainer:
             print(f"{BLUE}Step {i+1} Loss: {loss.item():.4f}{RESET}")
 
         final_loss = loss.item()
-        del inputs, labels, optimizer, outputs
+        del inputs, prompt_inputs, labels, optimizer, outputs
         torch.cuda.empty_cache()
         gc.collect()
         return final_loss
@@ -151,21 +244,31 @@ class VLMTrainer:
         
         with torch.inference_mode():
             tok = self.processor.tokenizer
+            prompt_len = inputs.input_ids.shape[-1]
+
+            logits_processor = LogitsProcessorList([EosBiasLogitsProcessor(eos_token_id=tok.eos_token_id, prompt_len=prompt_len, start_after_new_tokens=16, bias=5.0,)])
+            
             gen_out = self.model.generate(
                 **inputs,
-                max_new_tokens=128,
+                max_new_tokens=76,
                 do_sample=True,
-                temperature=0.6,
-                top_p=0.9,
+                temperature=0.70,
+                top_p=0.85,
                 top_k=30,
-                repetition_penalty=1.10,
+                repetition_penalty=1.08,
                 no_repeat_ngram_size=3,
                 eos_token_id=tok.eos_token_id,
                 pad_token_id=tok.eos_token_id,
-                # use_cache=False,   # uncomment if you still see loops
+                logits_processor=logits_processor,
+                # use_cache=False,
             )
+            
+            generated_tokens = gen_out[0][inputs.input_ids.shape[-1]:]
+            num_generated_tokens = generated_tokens.shape[0]
+            print(f"Generated tokens: {num_generated_tokens}")
+            
             response = self.processor.decode(
-                gen_out[0][inputs.input_ids.shape[-1]:],
+                generated_tokens,
                 skip_special_tokens=True
             )
         
